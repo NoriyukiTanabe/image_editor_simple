@@ -408,70 +408,45 @@ const ImageEditor: React.FC = () => {
         </div>
       </div>
 
-      {/* Replace Image Drop Zone */}
-      <div
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        className={`
-          transition-all duration-300 ease-in-out
-          ${isDragOver 
-            ? 'fixed inset-0 z-50 bg-blue-500/20 backdrop-blur-sm' 
-            : ''
-          }
-        `}
-      >
-        {isDragOver && (
-          <div className="flex items-center justify-center h-full">
-            <div className="bg-white rounded-xl p-8 shadow-2xl border-2 border-blue-500 border-dashed animate-pulse">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
-                </div>
-                <h3 className="text-xl font-bold text-blue-700 mb-2">Replace Image</h3>
-                <p className="text-blue-600">Drop to replace the current image</p>
-                <p className="text-sm text-gray-500 mt-2">Crops will be preserved</p>
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="flex gap-6">
+        {/* Canvas Area with Replace Drop Zone */}
+        <div className="flex-1">
+          <Canvas
+            ref={canvasRef}
+            image={image}
+            activeTool={activeTool}
+            onCropSave={handleCropSave}
+            shapeSettings={shapeSettings}
+            textSettings={textSettings}
+            pastedCrops={pastedCrops}
+            onPastedCropsChange={handlePastedCropsChange}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            isDragOver={isDragOver}
+          />
+        </div>
 
-        <div className="flex gap-6">
-          {/* Canvas Area */}
-          <div className="flex-1">
-            <Canvas
-              ref={canvasRef}
-              image={image}
-              activeTool={activeTool}
-              onCropSave={handleCropSave}
-              shapeSettings={shapeSettings}
-              textSettings={textSettings}
-              pastedCrops={pastedCrops}
-              onPastedCropsChange={handlePastedCropsChange}
+        {/* Side Panels */}
+        <div className="w-80 space-y-4">
+          {showCropPanel && (
+            <CropPanel 
+              crops={crops} 
+              onCropDelete={handleCropDelete}
+              onCropPaste={handleCropPaste}
             />
-          </div>
-
-          {/* Side Panels */}
-          <div className="w-80 space-y-4">
-            {showCropPanel && (
-              <CropPanel 
-                crops={crops} 
-                onCropDelete={handleCropDelete}
-                onCropPaste={handleCropPaste}
-              />
-            )}
-            {showTextTool && (
-              <TextTool onSettingsChange={handleTextSettingsChange} />
-            )}
-            {showShapeTool && (
-              <ShapeTool 
-                activeTool={activeTool} 
-                onToolSelect={handleToolSelect}
-                onSettingsChange={handleShapeSettingsChange}
-              />
-            )}
-          </div>
+          )}
+          {showTextTool && (
+            <TextTool onSettingsChange={handleTextSettingsChange} />
+          )}
+          {showShapeTool && (
+            <ShapeTool 
+              activeTool={activeTool} 
+              onToolSelect={handleToolSelect}
+              onSettingsChange={handleShapeSettingsChange}
+            />
+          )}
         </div>
       </div>
 

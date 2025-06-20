@@ -1,5 +1,6 @@
 import React, { forwardRef, useEffect, useRef, useState, useCallback } from 'react';
 import { Tool, CropData } from './ImageEditor';
+import { RefreshCw } from 'lucide-react';
 
 interface CanvasProps {
   image: HTMLImageElement;
@@ -17,6 +18,11 @@ interface CanvasProps {
   };
   pastedCrops?: PastedCrop[];
   onPastedCropsChange?: (crops: PastedCrop[]) => void;
+  onDrop?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragEnter?: (e: React.DragEvent) => void;
+  onDragLeave?: (e: React.DragEvent) => void;
+  isDragOver?: boolean;
 }
 
 interface CropSelection {
@@ -60,7 +66,20 @@ export interface PastedCrop {
 }
 
 const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
-  ({ image, activeTool, onCropSave, shapeSettings, textSettings, pastedCrops = [], onPastedCropsChange }, ref) => {
+  ({ 
+    image, 
+    activeTool, 
+    onCropSave, 
+    shapeSettings, 
+    textSettings, 
+    pastedCrops = [], 
+    onPastedCropsChange,
+    onDrop,
+    onDragOver,
+    onDragEnter,
+    onDragLeave,
+    isDragOver = false
+  }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
@@ -446,8 +465,15 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
     };
 
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex justify-center" ref={containerRef}>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 relative">
+        <div 
+          className="flex justify-center relative" 
+          ref={containerRef}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          onDragEnter={onDragEnter}
+          onDragLeave={onDragLeave}
+        >
           <canvas
             ref={canvasRef}
             width={canvasSize.width}
@@ -464,6 +490,22 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
               cursor: getCursor()
             }}
           />
+          
+          {/* Replace Image Drop Overlay - Only over canvas */}
+          {isDragOver && (
+            <div className="absolute inset-4 bg-blue-500/20 backdrop-blur-sm rounded-lg border-2 border-blue-500 border-dashed flex items-center justify-center z-10">
+              <div className="bg-white rounded-xl p-6 shadow-2xl border-2 border-blue-500 border-dashed animate-pulse">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" />
+                  </div>
+                  <h3 className="text-lg font-bold text-blue-700 mb-1">Replace Image</h3>
+                  <p className="text-blue-600 text-sm">Drop to replace the current image</p>
+                  <p className="text-xs text-gray-500 mt-1">Crops will be preserved</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* Canvas Info */}
