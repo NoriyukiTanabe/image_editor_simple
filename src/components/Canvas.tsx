@@ -1,6 +1,6 @@
 import React, { forwardRef, useEffect, useRef, useState, useCallback } from 'react';
 import { Tool, CropData } from './ImageEditor';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Move, Maximize2 } from 'lucide-react';
 
 interface CanvasProps {
   image: HTMLImageElement;
@@ -108,6 +108,8 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
       mouseX: number;
       mouseY: number;
     } | null>(null);
+    const [hoveredCrop, setHoveredCrop] = useState<string | null>(null);
+    const [hoveredHandle, setHoveredHandle] = useState<string | null>(null);
 
     // Calculate canvas size based on image
     useEffect(() => {
@@ -189,13 +191,25 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
 
     // Get resize handles for selected crop
     const getResizeHandles = (crop: PastedCrop): ResizeHandle[] => {
-      const handleSize = 8;
+      const handleSize = 12;
       return [
         { type: 'nw', x: crop.x - handleSize/2, y: crop.y - handleSize/2, size: handleSize },
         { type: 'ne', x: crop.x + crop.width - handleSize/2, y: crop.y - handleSize/2, size: handleSize },
         { type: 'sw', x: crop.x - handleSize/2, y: crop.y + crop.height - handleSize/2, size: handleSize },
         { type: 'se', x: crop.x + crop.width - handleSize/2, y: crop.y + crop.height - handleSize/2, size: handleSize },
       ];
+    };
+
+    // Get move area (center area excluding handles)
+    const getMoveArea = (crop: PastedCrop) => {
+      const handleSize = 12;
+      const margin = handleSize;
+      return {
+        x: crop.x + margin,
+        y: crop.y + margin,
+        width: crop.width - margin * 2,
+        height: crop.height - margin * 2
+      };
     };
 
     // Draw canvas content
@@ -215,26 +229,143 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
       // Draw pasted crops
       pastedCrops.forEach(crop => {
         if (crop.image) {
+          // Add subtle shadow for depth
+          if (selectedCrop === crop.id || hoveredCrop === crop.id) {
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+          }
+          
           ctx.drawImage(crop.image, crop.x, crop.y, crop.width, crop.height);
           
-          // Draw selection border if this crop is selected
+          // Reset shadow
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          // Draw selection border and controls if this crop is selected
           if (selectedCrop === crop.id) {
+            // Selection border
             ctx.strokeStyle = '#3B82F6';
             ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
-            ctx.strokeRect(crop.x - 2, crop.y - 2, crop.width + 4, crop.height + 4);
+            ctx.setLineDash([8, 4]);
+            ctx.strokeRect(crop.x - 3, crop.y - 3, crop.width + 6, crop.height + 6);
             ctx.setLineDash([]);
+            
+            // Move area indicator (center area)
+            const moveArea = getMoveArea(crop);
+            if (moveArea.width > 0 && moveArea.height > 0) {
+              ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+              ctx.fillRect(moveArea.x, moveArea.y, moveArea.width, moveArea.height);
+              
+              // Move icon in center
+              const centerX = crop.x + crop.width / 2;
+              const centerY = crop.y + crop.height / 2;
+              
+              // Draw move icon background
+              ctx.fillStyle = 'rgba(59, 130, 246, 0.9)';
+              ctx.beginPath();
+              ctx.arc(centerX, centerY, 12, 0, 2 * Math.PI);
+              ctx.fill();
+              
+              // Draw move icon (4 arrows)
+              ctx.strokeStyle = '#FFFFFF';
+              ctx.lineWidth = 2;
+              ctx.lineCap = 'round';
+              
+              // Up arrow
+              ctx.beginPath();
+              ctx.moveTo(centerX, centerY - 6);
+              ctx.lineTo(centerX, centerY - 3);
+              ctx.moveTo(centerX - 2, centerY - 5);
+              ctx.lineTo(centerX, centerY - 7);
+              ctx.lineTo(centerX + 2, centerY - 5);
+              ctx.stroke();
+              
+              // Down arrow
+              ctx.beginPath();
+              ctx.moveTo(centerX, centerY + 6);
+              ctx.lineTo(centerX, centerY + 3);
+              ctx.moveTo(centerX - 2, centerY + 5);
+              ctx.lineTo(centerX, centerY + 7);
+              ctx.lineTo(centerX + 2, centerY + 5);
+              ctx.stroke();
+              
+              // Left arrow
+              ctx.beginPath();
+              ctx.moveTo(centerX - 6, centerY);
+              ctx.lineTo(centerX - 3, centerY);
+              ctx.moveTo(centerX - 5, centerY - 2);
+              ctx.lineTo(centerX - 7, centerY);
+              ctx.lineTo(centerX - 5, centerY + 2);
+              ctx.stroke();
+              
+              // Right arrow
+              ctx.beginPath();
+              ctx.moveTo(centerX + 6, centerY);
+              ctx.lineTo(centerX + 3, centerY);
+              ctx.moveTo(centerX + 5, centerY - 2);
+              ctx.lineTo(centerX + 7, centerY);
+              ctx.lineTo(centerX + 5, centerY + 2);
+              ctx.stroke();
+            }
             
             // Draw resize handles
             const handles = getResizeHandles(crop);
-            ctx.fillStyle = '#3B82F6';
-            ctx.strokeStyle = '#FFFFFF';
-            ctx.lineWidth = 1;
             
             handles.forEach(handle => {
-              ctx.fillRect(handle.x, handle.y, handle.size, handle.size);
-              ctx.strokeRect(handle.x, handle.y, handle.size, handle.size);
+              // Handle background
+              ctx.fillStyle = hoveredHandle === handle.type ? '#1D4ED8' : '#3B82F6';
+              ctx.strokeStyle = '#FFFFFF';
+              ctx.lineWidth = 2;
+              
+              // Draw handle as rounded rectangle
+              const radius = 2;
+              ctx.beginPath();
+              ctx.roundRect(handle.x, handle.y, handle.size, handle.size, radius);
+              ctx.fill();
+              ctx.stroke();
+              
+              // Draw resize icon in handle
+              ctx.strokeStyle = '#FFFFFF';
+              ctx.lineWidth = 1.5;
+              ctx.lineCap = 'round';
+              
+              const hx = handle.x + handle.size / 2;
+              const hy = handle.y + handle.size / 2;
+              
+              // Draw diagonal resize arrows based on handle type
+              if (handle.type === 'nw' || handle.type === 'se') {
+                // NW-SE diagonal
+                ctx.beginPath();
+                ctx.moveTo(hx - 3, hy - 3);
+                ctx.lineTo(hx + 3, hy + 3);
+                ctx.moveTo(hx - 2, hy - 4);
+                ctx.lineTo(hx - 4, hy - 2);
+                ctx.moveTo(hx + 2, hy + 4);
+                ctx.lineTo(hx + 4, hy + 2);
+                ctx.stroke();
+              } else {
+                // NE-SW diagonal
+                ctx.beginPath();
+                ctx.moveTo(hx - 3, hy + 3);
+                ctx.lineTo(hx + 3, hy - 3);
+                ctx.moveTo(hx - 2, hy + 4);
+                ctx.lineTo(hx - 4, hy + 2);
+                ctx.moveTo(hx + 2, hy - 4);
+                ctx.lineTo(hx + 4, hy - 2);
+                ctx.stroke();
+              }
             });
+          } else if (hoveredCrop === crop.id) {
+            // Hover border
+            ctx.strokeStyle = '#60A5FA';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.strokeRect(crop.x - 1, crop.y - 1, crop.width + 2, crop.height + 2);
+            ctx.setLineDash([]);
           }
         }
       });
@@ -290,7 +421,7 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
         ctx.strokeRect(cropSelection.startX, cropSelection.startY, width, height);
         ctx.setLineDash([]);
       }
-    }, [image, textElements, shapeElements, cropSelection, pastedCrops, selectedCrop]);
+    }, [image, textElements, shapeElements, cropSelection, pastedCrops, selectedCrop, hoveredCrop, hoveredHandle]);
 
     // Redraw canvas when dependencies change
     useEffect(() => {
@@ -334,6 +465,12 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
       return null;
     };
 
+    const isInMoveArea = (x: number, y: number, crop: PastedCrop): boolean => {
+      const moveArea = getMoveArea(crop);
+      return x >= moveArea.x && x <= moveArea.x + moveArea.width &&
+             y >= moveArea.y && y <= moveArea.y + moveArea.height;
+    };
+
     const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
       const pos = getCanvasCoordinates(e);
 
@@ -357,7 +494,7 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
             mouseX: pos.x,
             mouseY: pos.y
           });
-        } else {
+        } else if (isInMoveArea(pos.x, pos.y, clickedCrop)) {
           setIsDragging(true);
           setDragOffset({
             x: pos.x - clickedCrop.x,
@@ -413,6 +550,19 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
 
     const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
       const pos = getCanvasCoordinates(e);
+
+      // Update hover states for better UX
+      if (activeTool.type === 'select' && !isDragging && !isResizing) {
+        const hoveredCropData = findCropAtPosition(pos.x, pos.y);
+        setHoveredCrop(hoveredCropData?.id || null);
+        
+        if (hoveredCropData && selectedCrop === hoveredCropData.id) {
+          const handleType = findResizeHandleAtPosition(pos.x, pos.y, hoveredCropData);
+          setHoveredHandle(handleType);
+        } else {
+          setHoveredHandle(null);
+        }
+      }
 
       if (isResizing && selectedCrop && resizeStartData && onPastedCropsChange) {
         const deltaX = pos.x - resizeStartData.mouseX;
@@ -591,13 +741,30 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
           return 'grabbing';
         }
         
-        // Check if hovering over a crop or resize handle
-        const canvas = canvasRef.current;
-        if (canvas && selectedCrop) {
-          const selectedCropData = pastedCrops.find(crop => crop.id === selectedCrop);
-          if (selectedCropData) {
-            return 'grab';
+        // Check hover states
+        if (hoveredHandle) {
+          switch (hoveredHandle) {
+            case 'nw':
+            case 'se':
+              return 'nw-resize';
+            case 'ne':
+            case 'sw':
+              return 'ne-resize';
+            default:
+              return 'default';
           }
+        }
+        
+        if (hoveredCrop) {
+          const cropData = pastedCrops.find(crop => crop.id === hoveredCrop);
+          if (cropData && selectedCrop === hoveredCrop) {
+            // Check if we're in the move area
+            const canvas = canvasRef.current;
+            if (canvas) {
+              return 'grab';
+            }
+          }
+          return 'pointer';
         }
         
         return 'default';
@@ -658,8 +825,13 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
             </span>
           )}
           {selectedCrop && (
-            <span className="ml-2 text-blue-600">
-              • Crop selected (Drag to move, drag corners to resize, Delete to remove)
+            <span className="ml-2 text-blue-600 font-medium">
+              • Crop selected: Drag center to move, drag corners to resize, Delete to remove
+            </span>
+          )}
+          {hoveredCrop && !selectedCrop && (
+            <span className="ml-2 text-blue-500">
+              • Click to select crop
             </span>
           )}
         </div>
