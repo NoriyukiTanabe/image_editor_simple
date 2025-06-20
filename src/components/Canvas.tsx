@@ -65,6 +65,13 @@ export interface PastedCrop {
   image?: HTMLImageElement;
 }
 
+interface ResizeHandle {
+  type: 'nw' | 'ne' | 'sw' | 'se';
+  x: number;
+  y: number;
+  size: number;
+}
+
 const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
   ({ 
     image, 
@@ -90,7 +97,17 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
     const [isDrawing, setIsDrawing] = useState(false);
     const [selectedCrop, setSelectedCrop] = useState<string | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [isResizing, setIsResizing] = useState(false);
+    const [resizeHandle, setResizeHandle] = useState<string | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const [resizeStartData, setResizeStartData] = useState<{
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      mouseX: number;
+      mouseY: number;
+    } | null>(null);
 
     // Calculate canvas size based on image
     useEffect(() => {
@@ -170,6 +187,17 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
       });
     }, [pastedCrops]);
 
+    // Get resize handles for selected crop
+    const getResizeHandles = (crop: PastedCrop): ResizeHandle[] => {
+      const handleSize = 8;
+      return [
+        { type: 'nw', x: crop.x - handleSize/2, y: crop.y - handleSize/2, size: handleSize },
+        { type: 'ne', x: crop.x + crop.width - handleSize/2, y: crop.y - handleSize/2, size: handleSize },
+        { type: 'sw', x: crop.x - handleSize/2, y: crop.y + crop.height - handleSize/2, size: handleSize },
+        { type: 'se', x: crop.x + crop.width - handleSize/2, y: crop.y + crop.height - handleSize/2, size: handleSize },
+      ];
+    };
+
     // Draw canvas content
     const drawCanvas = useCallback(() => {
       const canvas = canvasRef.current;
@@ -198,17 +226,14 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
             ctx.setLineDash([]);
             
             // Draw resize handles
-            const handleSize = 8;
-            const handles = [
-              { x: crop.x - handleSize/2, y: crop.y - handleSize/2 }, // top-left
-              { x: crop.x + crop.width - handleSize/2, y: crop.y - handleSize/2 }, // top-right
-              { x: crop.x - handleSize/2, y: crop.y + crop.height - handleSize/2 }, // bottom-left
-              { x: crop.x + crop.width - handleSize/2, y: crop.y + crop.height - handleSize/2 }, // bottom-right
-            ];
-            
+            const handles = getResizeHandles(crop);
             ctx.fillStyle = '#3B82F6';
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 1;
+            
             handles.forEach(handle => {
-              ctx.fillRect(handle.x, handle.y, handleSize, handleSize);
+              ctx.fillRect(handle.x, handle.y, handle.size, handle.size);
+              ctx.strokeRect(handle.x, handle.y, handle.size, handle.size);
             });
           }
         }
@@ -298,6 +323,17 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
       return null;
     };
 
+    const findResizeHandleAtPosition = (x: number, y: number, crop: PastedCrop): string | null => {
+      const handles = getResizeHandles(crop);
+      for (const handle of handles) {
+        if (x >= handle.x && x <= handle.x + handle.size &&
+            y >= handle.y && y <= handle.y + handle.size) {
+          return handle.type;
+        }
+      }
+      return null;
+    };
+
     const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
       const pos = getCanvasCoordinates(e);
 
@@ -306,11 +342,28 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
       
       if (clickedCrop && activeTool.type === 'select') {
         setSelectedCrop(clickedCrop.id);
-        setIsDragging(true);
-        setDragOffset({
-          x: pos.x - clickedCrop.x,
-          y: pos.y - clickedCrop.y
-        });
+        
+        // Check if clicking on a resize handle
+        const handleType = findResizeHandleAtPosition(pos.x, pos.y, clickedCrop);
+        
+        if (handleType) {
+          setIsResizing(true);
+          setResizeHandle(handleType);
+          setResizeStartData({
+            x: clickedCrop.x,
+            y: clickedCrop.y,
+            width: clickedCrop.width,
+            height: clickedCrop.height,
+            mouseX: pos.x,
+            mouseY: pos.y
+          });
+        } else {
+          setIsDragging(true);
+          setDragOffset({
+            x: pos.x - clickedCrop.x,
+            y: pos.y - clickedCrop.y
+          });
+        }
         return;
       }
 
@@ -361,13 +414,73 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
     const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
       const pos = getCanvasCoordinates(e);
 
-      if (isDragging && selectedCrop && onPastedCropsChange) {
+      if (isResizing && selectedCrop && resizeStartData && onPastedCropsChange) {
+        const deltaX = pos.x - resizeStartData.mouseX;
+        const deltaY = pos.y - resizeStartData.mouseY;
+        
+        const updatedCrops = pastedCrops.map(crop => {
+          if (crop.id === selectedCrop) {
+            let newX = resizeStartData.x;
+            let newY = resizeStartData.y;
+            let newWidth = resizeStartData.width;
+            let newHeight = resizeStartData.height;
+            
+            switch (resizeHandle) {
+              case 'nw':
+                newX = resizeStartData.x + deltaX;
+                newY = resizeStartData.y + deltaY;
+                newWidth = resizeStartData.width - deltaX;
+                newHeight = resizeStartData.height - deltaY;
+                break;
+              case 'ne':
+                newY = resizeStartData.y + deltaY;
+                newWidth = resizeStartData.width + deltaX;
+                newHeight = resizeStartData.height - deltaY;
+                break;
+              case 'sw':
+                newX = resizeStartData.x + deltaX;
+                newWidth = resizeStartData.width - deltaX;
+                newHeight = resizeStartData.height + deltaY;
+                break;
+              case 'se':
+                newWidth = resizeStartData.width + deltaX;
+                newHeight = resizeStartData.height + deltaY;
+                break;
+            }
+            
+            // Ensure minimum size
+            const minSize = 20;
+            if (newWidth < minSize) {
+              if (resizeHandle === 'nw' || resizeHandle === 'sw') {
+                newX = newX + newWidth - minSize;
+              }
+              newWidth = minSize;
+            }
+            if (newHeight < minSize) {
+              if (resizeHandle === 'nw' || resizeHandle === 'ne') {
+                newY = newY + newHeight - minSize;
+              }
+              newHeight = minSize;
+            }
+            
+            return {
+              ...crop,
+              x: Math.max(0, newX),
+              y: Math.max(0, newY),
+              width: newWidth,
+              height: newHeight
+            };
+          }
+          return crop;
+        });
+        onPastedCropsChange(updatedCrops);
+      } else if (isDragging && selectedCrop && onPastedCropsChange) {
         const updatedCrops = pastedCrops.map(crop => {
           if (crop.id === selectedCrop) {
             return {
               ...crop,
-              x: pos.x - dragOffset.x,
-              y: pos.y - dragOffset.y
+              x: Math.max(0, pos.x - dragOffset.x),
+              y: Math.max(0, pos.y - dragOffset.y)
             };
           }
           return crop;
@@ -427,6 +540,9 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
 
       setIsDrawing(false);
       setIsDragging(false);
+      setIsResizing(false);
+      setResizeHandle(null);
+      setResizeStartData(null);
     };
 
     // Handle keyboard events for deleting selected crops
@@ -459,6 +575,31 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
     // Update cursor based on tool and hover state
     const getCursor = () => {
       if (activeTool.type === 'select') {
+        if (isResizing) {
+          switch (resizeHandle) {
+            case 'nw':
+            case 'se':
+              return 'nw-resize';
+            case 'ne':
+            case 'sw':
+              return 'ne-resize';
+            default:
+              return 'default';
+          }
+        }
+        if (isDragging) {
+          return 'grabbing';
+        }
+        
+        // Check if hovering over a crop or resize handle
+        const canvas = canvasRef.current;
+        if (canvas && selectedCrop) {
+          const selectedCropData = pastedCrops.find(crop => crop.id === selectedCrop);
+          if (selectedCropData) {
+            return 'grab';
+          }
+        }
+        
         return 'default';
       }
       return 'crosshair';
@@ -518,7 +659,7 @@ const Canvas = forwardRef<HTMLCanvasElement, CanvasProps>(
           )}
           {selectedCrop && (
             <span className="ml-2 text-blue-600">
-              • Crop selected (Press Delete to remove)
+              • Crop selected (Drag to move, drag corners to resize, Delete to remove)
             </span>
           )}
         </div>
