@@ -7,9 +7,17 @@ interface CropPanelProps {
   crops: CropData[];
   onCropDelete: (cropId: string) => void;
   onCropPaste: (crop: CropData) => void;
+  title?: string;
+  description?: string;
 }
 
-const CropPanel: React.FC<CropPanelProps> = ({ crops, onCropDelete, onCropPaste }) => {
+const CropPanel: React.FC<CropPanelProps> = ({ 
+  crops, 
+  onCropDelete, 
+  onCropPaste,
+  title = "Saved Crops",
+  description = "No crops saved yet. Use the crop tool to create selections."
+}) => {
   const handleDownloadCrop = (crop: CropData) => {
     const link = document.createElement('a');
     link.download = `crop-${crop.id}.png`;
@@ -23,18 +31,18 @@ const CropPanel: React.FC<CropPanelProps> = ({ crops, onCropDelete, onCropPaste 
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Saved Crops</h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
       
       {crops.length === 0 ? (
-        <p className="text-gray-500 text-sm">No crops saved yet. Use the crop tool to create selections.</p>
+        <p className="text-gray-500 text-sm">{description}</p>
       ) : (
         <div className="space-y-3">
           {crops.map((crop) => (
-            <div key={crop.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg">
+            <div key={crop.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors duration-200">
               <img
                 src={crop.imageData}
                 alt={`Crop ${crop.id}`}
-                className="w-16 h-16 object-cover rounded border"
+                className="w-16 h-16 object-cover rounded border shadow-sm"
               />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
@@ -75,7 +83,7 @@ const CropPanel: React.FC<CropPanelProps> = ({ crops, onCropDelete, onCropPaste 
       {crops.length > 0 && (
         <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
           <p className="text-sm text-blue-800">
-            <strong>Tip:</strong> Click the copy icon to paste crops onto the canvas. Use the select tool to move them around.
+            <strong>Tip:</strong> Click the copy icon to paste crops onto the canvas. Use the select tool to move and resize them.
           </p>
         </div>
       )}

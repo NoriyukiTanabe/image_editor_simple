@@ -47,6 +47,7 @@ const ImageEditor: React.FC = () => {
   const [showCropPanel, setShowCropPanel] = useState(false);
   const [showTextTool, setShowTextTool] = useState(false);
   const [showShapeTool, setShowShapeTool] = useState(false);
+  const [showSelectPanel, setShowSelectPanel] = useState(false);
   const [uploadState, setUploadState] = useState<UploadState>({
     isUploading: false,
     progress: 0,
@@ -171,6 +172,7 @@ const ImageEditor: React.FC = () => {
     setShowCropPanel(tool.type === 'crop');
     setShowTextTool(tool.type === 'text');
     setShowShapeTool(tool.type === 'shape');
+    setShowSelectPanel(tool.type === 'select');
   }, []);
 
   const handleCropSave = useCallback((cropData: CropData) => {
@@ -197,6 +199,7 @@ const ImageEditor: React.FC = () => {
     setShowCropPanel(false);
     setShowTextTool(false);
     setShowShapeTool(false);
+    setShowSelectPanel(true);
   }, []);
 
   const handlePastedCropsChange = useCallback((crops: PastedCrop[]) => {
@@ -220,6 +223,7 @@ const ImageEditor: React.FC = () => {
     setShowCropPanel(false);
     setShowTextTool(false);
     setShowShapeTool(false);
+    setShowSelectPanel(false);
     setUploadState({
       isUploading: false,
       progress: 0,
@@ -430,11 +434,22 @@ const ImageEditor: React.FC = () => {
 
         {/* Side Panels */}
         <div className="w-80 space-y-4">
+          {showSelectPanel && (
+            <CropPanel 
+              crops={crops} 
+              onCropDelete={handleCropDelete}
+              onCropPaste={handleCropPaste}
+              title="Available Crops"
+              description="Click the copy icon to paste crops onto the canvas for editing."
+            />
+          )}
           {showCropPanel && (
             <CropPanel 
               crops={crops} 
               onCropDelete={handleCropDelete}
               onCropPaste={handleCropPaste}
+              title="Saved Crops"
+              description="Use the crop tool to create selections."
             />
           )}
           {showTextTool && (
